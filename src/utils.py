@@ -1,5 +1,6 @@
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv), data manipulation as in SQL
+import os
 from sklearn.preprocessing import MinMaxScaler
 
 import tensorflow as tf
@@ -9,7 +10,11 @@ def rmse(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
 
 def power_data():
-    df = pd.read_csv('../Dataset/Power conumption dataset/household_power_consumption.txt', sep=';',
+    power_txt_path = '../Dataset/Power conumption dataset/household_power_consumption.txt'
+    power_zip_path = '../Dataset/Power conumption dataset/household_power_consumption.zip'
+    power_path = power_txt_path if os.path.isfile(power_txt_path) else power_zip_path
+
+    df = pd.read_csv(power_path, sep=';',
                  parse_dates={'dt' : ['Date', 'Time']}, infer_datetime_format=True,
                  low_memory=False, na_values=['nan','?'], index_col='dt')
 
@@ -144,7 +149,10 @@ def google_data():
 
 
 def traffic_data():
-    df = pd.read_csv("../Dataset/PEMS08-Traffic-Flow-Forecasting-main/traffic_dataset.csv")
+    preferred_path = "../Dataset/PEMS08-Traffic-Flow-Forecasting-main/traffic_dataset.csv"
+    fallback_path = "../Dataset/PEMS08 traffic flow dataset/traffic_dataset.csv"
+    traffic_path = preferred_path if os.path.isfile(preferred_path) else fallback_path
+    df = pd.read_csv(traffic_path)
 
     values = df[["flow", "occupy", "speed"]].values
 
@@ -197,10 +205,43 @@ def compute_gradient(model_fn, loss_fn, x, y, targeted):
     return grad
 
 
+def _to_numpy(value):
+    if isinstance(value, tf.Tensor):
+        return value.numpy()
+    return np.array(value)
+
+
+def compute_time_step_saliency(model_fn, loss_fn, x, y, targeted=False):
+    ten_x = tf.convert_to_tensor(x)
+    grad = compute_gradient(model_fn, loss_fn, ten_x, y, targeted)
+    grad_np = _to_numpy(grad)
+    saliency = np.sum(np.abs(grad_np), axis=2)
+    return grad_np, saliency
+
+
+def build_time_step_mask(saliency, top_ratio=0.1):
+    saliency = np.array(saliency)
+    batch_size, time_steps = saliency.shape
+    top_k = max(1, int(np.ceil(time_steps * top_ratio)))
+    mask = np.zeros_like(saliency, dtype=np.float32)
+
+    for i in range(batch_size):
+        key_indices = np.argsort(saliency[i])[-top_k:]
+        mask[i, key_indices] = 1.0
+
+    return mask[..., np.newaxis]
+
+
+def perturbation_ratio(X, X_adv):
+    delta = np.abs(np.array(X_adv) - np.array(X))
+    changed_time_steps = np.any(delta > 1e-12, axis=2)
+    return float(np.mean(changed_time_steps))
+
+
 def fgsm(X, Y, model, loss_fn , epsilon, targeted= False):
     ten_X = tf.convert_to_tensor(X)
     grad = compute_gradient(model,loss_fn,ten_X,Y,targeted)
-    dir = np.sign(grad)
+    dir = np.sign(_to_numpy(grad))
     return X + epsilon * dir, Y
 
 
@@ -209,8 +250,31 @@ def bim(X, Y, model, loss_fn, epsilon, alpha, I, targeted= False):
     for t in range(I):
         ten_X = tf.convert_to_tensor(Xp)
         grad = compute_gradient(model,loss_fn,ten_X,Y,targeted)
-        dir = np.sign(grad)
+        dir = np.sign(_to_numpy(grad))
         Xp = Xp + alpha * dir
         Xp = np.where(Xp > X+epsilon, X+epsilon, Xp)
         Xp = np.where(Xp < X-epsilon, X-epsilon, Xp)
     return Xp, Y
+
+
+def ktsa_fgsm(X, Y, model, loss_fn, epsilon, top_ratio=0.1, targeted=False):
+    grad_np, saliency = compute_time_step_saliency(model, loss_fn, X, Y, targeted)
+    mask = build_time_step_mask(saliency, top_ratio=top_ratio)
+    direction = np.sign(grad_np) * mask
+    return X + epsilon * direction, Y, saliency, mask
+
+
+def ktsa_bim(X, Y, model, loss_fn, epsilon, alpha, I, top_ratio=0.1, targeted=False):
+    grad_np, saliency = compute_time_step_saliency(model, loss_fn, X, Y, targeted)
+    mask = build_time_step_mask(saliency, top_ratio=top_ratio)
+    Xp = np.copy(X)
+
+    for t in range(I):
+        ten_X = tf.convert_to_tensor(Xp)
+        grad = compute_gradient(model, loss_fn, ten_X, Y, targeted)
+        direction = np.sign(_to_numpy(grad)) * mask
+        Xp = Xp + alpha * direction
+        Xp = np.where(Xp > X + epsilon, X + epsilon, Xp)
+        Xp = np.where(Xp < X - epsilon, X - epsilon, Xp)
+
+    return Xp, Y, saliency, mask

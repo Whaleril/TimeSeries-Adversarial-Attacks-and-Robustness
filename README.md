@@ -69,18 +69,29 @@ Run from the `src/` directory.
 
 For the traffic flow dataset:
 
+You can use uv to install the packages. [(uv install doc)](https://docs.astral.sh/uv/getting-started/installation/)
 ```powershell
-cd "LSTM-Timeseries-Adversarial-Attacks\src"
-python Traffic_LSTM.py
-python Traffic_LSTM_test.py
+git clone https://github.com/Whaleril/TimeSeries-Adversarial-Attacks-and-Robustness.git
+cd LSTM-Timeseries-Adversarial-Attacks
+uv sync 
+```
+
+Then cd src to run.
+```powershell
+cd src
+```
+
+
+```powershell
+uv run Traffic_LSTM.py
+uv run Traffic_LSTM_test.py
 ```
 
 For the power dataset:
 
 ```powershell
-cd "LSTM-Timeseries-Adversarial-Attacks\src"
-python Power_LSTM.py
-python Power_LSTM_test.py
+uv run Power_LSTM.py
+uv run Power_LSTM_test.py
 ```
 
 ## Code Provenance

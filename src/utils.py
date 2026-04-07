@@ -278,3 +278,51 @@ def ktsa_bim(X, Y, model, loss_fn, epsilon, alpha, I, top_ratio=0.1, targeted=Fa
         Xp = np.where(Xp < X - epsilon, X - epsilon, Xp)
 
     return Xp, Y, saliency, mask
+
+
+def build_random_time_step_mask(batch_size, time_steps, top_ratio=0.1):
+    """
+    随机生成时间步掩码，数量严格对齐 KTSA 的 top_k。
+    """
+    top_k = max(1, int(np.ceil(time_steps * top_ratio)))
+    mask = np.zeros((batch_size, time_steps), dtype=np.float32)
+
+    for i in range(batch_size):
+        # 在时间步中随机抽取 top_k 个索引，不重复
+        random_indices = np.random.choice(time_steps, top_k, replace=False)
+        mask[i, random_indices] = 1.0
+
+    return mask[..., np.newaxis]
+
+
+def random_fgsm(X, Y, model, loss_fn, epsilon, top_ratio=0.1, targeted=False):
+    """
+    基于随机选择时间步的 FGSM 攻击
+    """
+    batch_size, time_steps, _ = X.shape
+    mask = build_random_time_step_mask(batch_size, time_steps, top_ratio=top_ratio)
+
+    ten_X = tf.convert_to_tensor(X)
+    grad = compute_gradient(model, loss_fn, ten_X, Y, targeted)
+    # 取梯度方向并应用随机掩码
+    direction = np.sign(_to_numpy(grad)) * mask
+    return X + epsilon * direction, Y, mask
+
+
+def random_bim(X, Y, model, loss_fn, epsilon, alpha, I, top_ratio=0.1, targeted=False):
+    """
+    基于随机选择时间步的 BIM 迭代攻击
+    """
+    batch_size, time_steps, _ = X.shape
+    mask = build_random_time_step_mask(batch_size, time_steps, top_ratio=top_ratio)
+    Xp = np.copy(X)
+
+    for t in range(I):
+        ten_X = tf.convert_to_tensor(Xp)
+        grad = compute_gradient(model, loss_fn, ten_X, Y, targeted)
+        direction = np.sign(_to_numpy(grad)) * mask
+        Xp = Xp + alpha * direction
+        Xp = np.where(Xp > X + epsilon, X + epsilon, Xp)
+        Xp = np.where(Xp < X - epsilon, X - epsilon, Xp)
+
+    return Xp, Y, mask

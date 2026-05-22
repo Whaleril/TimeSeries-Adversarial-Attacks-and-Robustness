@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -7,8 +8,8 @@ from sklearn.metrics import mean_squared_error
 from utils import traffic_data
 from model import setup_bilstm_model
 
-
-model_path = r'D:\IDEA\BiLSTM\TimeSeries-Adversarial-Attacks-and-Robustness\Trained models\Traffic_regression_BiLSTM.h5'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+model_path = os.path.join(BASE_DIR, 'Trained models', 'Traffic_regression_BiLSTM.h5')
 
 
 train_X, train_y, val_X, val_y, test_X, test_y, scaler = traffic_data()
@@ -31,7 +32,7 @@ plt.title("model loss")
 plt.ylabel("loss")
 plt.xlabel("epoch")
 plt.legend(["train", "validation"], loc="upper right")
-plt.savefig(r'D:\IDEA\BiLSTM\TimeSeries-Adversarial-Attacks-and-Robustness\Images\Traffic_BiLSTM_train_loss.png')
+plt.savefig(os.path.join(BASE_DIR, 'Images', 'Traffic_BiLSTM_train_loss.png'))
 plt.close()
 
 yhat = model.predict(test_X)
@@ -57,5 +58,5 @@ plt.plot(aa, inv_yhat[: len(aa)], "r", label="prediction")
 plt.ylabel("Speed", size=15)
 plt.xlabel("Time step", size=15)
 plt.legend(fontsize=15)
-fig_verify.savefig(r'D:\IDEA\BiLSTM\TimeSeries-Adversarial-Attacks-and-Robustness\Images\Traffic_BiLSTM_train_plot.png')
+fig_verify.savefig(os.path.join(BASE_DIR, 'Images', 'Traffic_BiLSTM_train_plot.png'))
 plt.close(fig_verify)

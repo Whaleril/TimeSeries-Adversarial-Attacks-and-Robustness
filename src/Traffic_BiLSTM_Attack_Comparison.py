@@ -1,18 +1,18 @@
 import numpy as np
+import os
+import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 
-# 导入所需的攻击方法和工具函数
 from utils import traffic_data, fgsm, bim, ktsa_fgsm, ktsa_bim, rmse
 from model import setup_bilstm_model
 
-# 设置随机种子，保证每次运行结果一致
 np.random.seed(42)
 
-# 模型路径
-bilstm_model_path = r'D:\IDEA\BiLSTM\TimeSeries-Adversarial-Attacks-and-Robustness\Trained models\Traffic_regression_BiLSTM.h5'
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+bilstm_model_path = os.path.join(BASE_DIR, 'Trained models', 'Traffic_regression_BiLSTM.h5')
 
 # 攻击参数
 epsilon = 0.2
@@ -94,7 +94,7 @@ plt.legend(fontsize=12)
 plt.grid(True, linestyle='--', alpha=0.6)
 
 # 保存图表
-output_path = r'D:\IDEA\BiLSTM\TimeSeries-Adversarial-Attacks-and-Robustness\Images\BiLSTM_Attack_Comparison.png'
+output_path = os.path.join(BASE_DIR, 'Images', 'BiLSTM_Attack_Comparison.png')
 plt.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 

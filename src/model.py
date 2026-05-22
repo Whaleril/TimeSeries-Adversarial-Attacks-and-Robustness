@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, GRU, Conv1D, Dense, Flatten, InputLayer, Activation, Dropout
+from tensorflow.keras.layers import LSTM, GRU, Conv1D, Dense, Flatten, InputLayer, Activation, Dropout, Bidirectional
 
 from utils import rmse
 
@@ -57,8 +57,8 @@ def setup_gru_model(train_X,units):
 
 def setup_lstm_model(train_X,units):
 	model = Sequential()
+	model.add(InputLayer(input_shape=(train_X.shape[1], train_X.shape[2])))
 	model.add(LSTM(
-			input_shape=(train_X.shape[1], train_X.shape[2]),
 			units=units,
 			return_sequences=True))
 	model.add(Dropout(0.2))
@@ -69,6 +69,26 @@ def setup_lstm_model(train_X,units):
 	model.add(LSTM(
 			units=units,
 			return_sequences=False))
+	model.add(Dropout(0.2))
+	model.add(Dense(units=1))
+	model.compile(loss='mean_squared_error', optimizer='adam', metrics=[rmse])
+	return model
+
+
+def setup_bilstm_model(train_X,units):
+	model = Sequential()
+	model.add(InputLayer(input_shape=(train_X.shape[1], train_X.shape[2])))
+	model.add(Bidirectional(LSTM(
+			units=units,
+			return_sequences=True)))
+	model.add(Dropout(0.2))
+	model.add(Bidirectional(LSTM(
+			units=units,
+			return_sequences=True)))
+	model.add(Dropout(0.2))
+	model.add(Bidirectional(LSTM(
+			units=units,
+			return_sequences=False)))
 	model.add(Dropout(0.2))
 	model.add(Dense(units=1))
 	model.compile(loss='mean_squared_error', optimizer='adam', metrics=[rmse])
